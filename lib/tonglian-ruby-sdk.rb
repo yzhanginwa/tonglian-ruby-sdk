@@ -19,15 +19,16 @@ module TonglianRubySdk
       private_file = File.open(@private_path)
       private_key = OpenSSL::PKCS12.new(private_file, @private_passwd).key.export
       rsa = OpenSSL::PKey::RSA.new private_key
-      rsa.sign('sha1', str.force_encoding('UTF-8'))
+      Base64.encode64(rsa.sign('sha1', str.force_encoding('UTF-8')))
     end
 
-    def verify?(params, sign)
+    def verify?(params, signature = nil)
+      signature = params['sign'] if signature.nil? || signature.to_s.empty?
       str = make_sign_message(params)
       public_file = File.open(@public_path)
       public_key = OpenSSL::X509::Certificate.new(public_file).public_key.export
       rsa = OpenSSL::PKey::RSA.new(public_key)
-      rsa.verify('sha1', sign, str)
+      rsa.verify('sha1', Base64.decode64(signature), str)
     end
 
     private
