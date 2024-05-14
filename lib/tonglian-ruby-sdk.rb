@@ -1,5 +1,7 @@
 # to avoid error when loading PKCS12 private key file
-ENV['OPENSSL_CONF'] = './add-openssl-provider.conf'
+current_dir = File.dirname(__FILE__)
+provider_conf = File.join(current_dir, 'add-openssl-provider.conf')
+ENV['OPENSSL_CONF'] = provider_conf
 
 require 'openssl'
 require 'cgi'
@@ -84,7 +86,6 @@ module TonglianRubySdk
 
     def private_key
       return @private_key if @private_key
-
       private_file = File.open(@private_path)
       @private_key = OpenSSL::PKCS12.new(private_file, @private_passwd).key.export
     end
