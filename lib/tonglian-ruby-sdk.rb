@@ -33,7 +33,6 @@ module TonglianRubySdk
       data['sign']       = @signer.sign(data)
 
       url = URI(@api_end_point)
-
       http = Net::HTTP.new(url.host, url.port)
       http.use_ssl = true if @api_end_point.downcase.starts_with?('https') # Enable SSL for HTTPS
 
@@ -42,9 +41,9 @@ module TonglianRubySdk
       request.body = URI.encode_www_form(data)
       response = http.request(request)
 
-      # Handle response
-      puts response.code
-      puts response.body
+      object = JSON.parse(response.body)
+      @signer.verify?(object) || raise('Invalid response signature!')
+      { 'code' => response.code, 'data' => object }
     end
 
     private
@@ -65,18 +64,20 @@ module TonglianRubySdk
     end
 
     def sign(params)
-      str = make_sign_message(params)
+      message = make_sign_message(params)
       rsa = OpenSSL::PKey::RSA.new private_key
-      Base64.strict_encode64(rsa.sign('sha1', str.force_encoding('UTF-8')))
+      Base64.strict_encode64(rsa.sign(OpenSSL::Digest.new('SHA256'), message))
     end
 
     def verify?(params, signature = nil)
       signature = params['sign'] if signature.nil? || signature.to_s.empty?
-      str = make_sign_message(params)
+      params.delete('sign')
+      message = make_verify_message(params)
+
       public_file = File.open(@public_path)
       public_key = OpenSSL::X509::Certificate.new(public_file).public_key.export
       rsa = OpenSSL::PKey::RSA.new(public_key)
-      rsa.verify('sha1', Base64.decode64(signature), str)
+      rsa.verify(OpenSSL::Digest.new('SHA256'), Base64.decode64(signature), message)
     end
 
     private
@@ -100,11 +101,35 @@ module TonglianRubySdk
       params.keys.sort.map do |k|
         next if %w[sign signType].include? k
         next if params[k].nil? || params[k].to_s.empty?
-        #sorted_params.push("#{k}=#{CGI.escape(params[k])}")
+
         sorted_params.push("#{k}=#{params[k]}")
       end
 
-      Base64.strict_encode64(Digest::MD5.hexdigest(sorted_params.join('&')))
+      flattened_params = sorted_params.join('&')
+      md5_digest = Digest::MD5.digest(flattened_params)
+      Base64.strict_encode64(md5_digest)
+    end
+
+    def make_verify_message(params)
+      params = sort_object(params)
+      flattened_params = params.to_json
+      Base64.strict_encode64(Digest::MD5.digest(flattened_params))
+    end
+
+    # In Ruby 3, a hash preserves the order the keys are inserted
+    # So we can make a 'sorted' hash and generate a sorted json later
+    def sort_object(obj)
+      result = nil
+      if obj.is_a? Hash
+        result = {}
+        obj.keys.sort.each { |k| result[k] = sort_object(obj[k]) }
+      elsif obj.is_a? Array
+        result = []
+        obj.sort.each { |k| result.push(k) }
+      else
+        result = obj
+      end
+      result
     end
   end
 end
