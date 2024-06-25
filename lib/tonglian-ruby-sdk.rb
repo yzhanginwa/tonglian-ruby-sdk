@@ -1,7 +1,7 @@
 # to avoid error when loading PKCS12 private key file
 current_dir = File.dirname(__FILE__)
 provider_conf = File.join(current_dir, 'add-openssl-provider.conf')
-ENV['OPENSSL_CONF'] = provider_conf
+ENV['OPENSSL_CONF'] ||= provider_conf
 
 require 'openssl'
 require 'cgi'
@@ -126,7 +126,7 @@ module TonglianRubySdk
         obj.keys.sort.each { |k| result[k] = sort_object(obj[k]) }
       elsif obj.is_a? Array
         result = []
-        obj.sort.each { |k| result.push(k) }
+        obj.sort.each { |i| result.push(sort_object(i)) }
       else
         result = obj
       end
