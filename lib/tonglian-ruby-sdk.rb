@@ -125,8 +125,11 @@ module TonglianRubySdk
         result = {}
         obj.keys.sort.each { |k| result[k] = sort_object(obj[k]) }
       elsif obj.is_a? Array
+        # If obj is array, it doesn't need to sort.
+        # But still need to sort the items if they're hashes.
+        # And this process should recursively go to the bottom
         result = []
-        obj.sort.each { |i| result.push(sort_object(i)) }
+        obj.each { |i| result.push(sort_object(i)) }
       else
         result = obj
       end
